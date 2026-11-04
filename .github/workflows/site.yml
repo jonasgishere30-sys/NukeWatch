@@ -1,0 +1,90 @@
+name: Build and deploy NukeWatch
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '*.html'
+      - '*.css'
+      - '*.js'
+      - '*.geojson'
+      - '*.py'
+      - '.github/workflows/site.yml'
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: nukewatch-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check Pages configuration
+        uses: actions/configure-pages@v5
+      - name: Assemble uploaded source files into the required layout
+        run: |
+          mkdir -p _build/collector _build/assets
+          cp index.html _build/index.html
+          cp style.css app.js countries.geojson _build/assets/
+          cp run.py config.py sources.py _build/collector/
+          touch _build/collector/__init__.py _build/.nojekyll
+          python -m compileall -q _build/collector
+          node --check _build/assets/app.js
+      - name: Restore collection history
+        uses: actions/cache/restore@v4
+        with:
+          path: _build/data
+          key: nukewatch-data-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            nukewatch-data-
+      - name: Collect live data (never publish test fixtures)
+        working-directory: _build
+        env:
+          BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
+          BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
+        run: python -m collector.run
+      - name: Validate published files
+        run: |
+          python - <<'PY'
+          import json, pathlib, re
+          root = pathlib.Path('_build')
+          html = (root / 'index.html').read_text()
+          for ref in re.findall(r'(?:src|href)="([^"]+)"', html):
+              if not ref.startswith(('http:', 'https:', '#')):
+                  assert (root / ref).is_file(), f'Missing page dependency: {ref}'
+          json.loads((root / 'assets/countries.geojson').read_text())
+          data = json.loads((root / 'data/latest.json').read_text())
+          assert all(k in data for k in ('updated', 'score', 'flashpoints', 'aircraft', 'summary'))
+          assert 0 <= data['score'] <= 100
+          print('Asset paths, map data, and dashboard JSON passed validation.')
+          print('Source availability:', data.get('errors', {}))
+          PY
+      - name: Preserve baseline history for the next scan
+        uses: actions/cache/save@v4
+        with:
+          path: _build/data
+          key: nukewatch-data-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Package only public website files
+        run: rm -rf _build/collector
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _build
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4
