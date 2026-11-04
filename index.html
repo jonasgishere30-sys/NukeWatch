@@ -209,6 +209,19 @@
     </div>
   </section>
 
+  <section class="rule">
+    <details id="diagnostics" class="diag">
+      <summary id="diag-summary">Data sources</summary>
+      <p class="note">Every outside service this scan used, whether it worked, and the exact error when it didn't. “Old data” means the last good result is shown because the latest request failed. * = needed for the index.</p>
+      <div class="scroll-x">
+        <table class="tbl diag-tbl">
+          <thead><tr><th>Source</th><th>Status</th><th>Last success</th><th>Details</th></tr></thead>
+          <tbody id="diag-rows"></tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
   <footer class="foot">
     <span>NukeWatch · open source</span>
     <span id="foot-scan" class="dim"></span>

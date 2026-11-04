@@ -35,3 +35,38 @@ for q in config.BLUESKY_QUERIES:
 for s in config.REDDIT_SUBS:
     w(f"reddit_{s}.json", {"data": {"children": [{"data": {"title": f"TEST nuclear missile thread {s}", "created_utc": now.timestamp(), "score": 50, "num_comments": 9, "permalink": f"/r/{s}/test"}}]}})
 print("fixtures written to", D)
+
+# ---- extra signal fixtures ----
+for name, q in config.TOPIC_QUERIES:
+    pts = [{"date": g(now - timedelta(minutes=15 * k)), "value": 2 + (k % 3) + (6 if (k < 96 and name == "Missile launch") else 0)} for k in range(672)]
+    w("gdelt_vol_" + _slug(q) + ".json", {"timeline": [{"series": "Article Count", "data": pts[::-1]}]})
+    w("gdelt_art_" + _slug(q) + ".json", {"articles": [{"url": "https://example.com/t", "title": f"TEST {name} story", "seendate": g(now), "socialimage": "", "domain": "example.com", "sourcecountry": "US"}]})
+w("usgs_week.json", {"features": [{"geometry": {"coordinates": [129.1, 41.3, 0.5]}, "properties": {"mag": 4.1, "place": "TEST near Punggye-ri", "time": int(now.timestamp() * 1000) - 3600000, "url": "https://earthquake.usgs.gov/"}},
+                                  {"geometry": {"coordinates": [10, 10, 30]}, "properties": {"mag": 3, "place": "far away", "time": 0}}]})
+w("nga_warnings.json", {"broadcast-warn": [{"navArea": "XII", "msgNumber": 101, "msgYear": 2026, "authority": "TEST", "issueDate": "031200Z NOV 2026", "text": "TEST HAZARDOUS OPERATIONS, ROCKET LAUNCHING 0400Z TO 0600Z"},
+                                          {"navArea": "IV", "msgNumber": 7, "msgYear": 2026, "text": "TEST buoy adrift"}]})
+w("ioda_summary.json", {"data": [{"entity": {"code": "UA", "name": "Ukraine", "type": "country"}, "scores": {"overall": 2400}, "event_cnt": 3}, {"entity": {"code": "US", "name": "US"}, "scores": {"overall": 99}}]})
+for a in config.WIKI_ARTICLES:
+    w("wiki_" + _slug(a) + ".json", {"items": [{"views": 1000 + (i % 4) * 30 + (1500 if (i == 29 and a == "Potassium_iodide") else 0)} for i in range(30)]})
+w("vix.csv", "DATE,OPEN,HIGH,LOW,CLOSE\n" + "\n".join(f"10/{d:02d}/2026,18,19,17,{17 + d % 3}" for d in range(1, 31)))
+for label, _prov in config.MARKETS:
+    sym = next((s for k, s in _prov if k == "stooq"), None)
+    if not sym: continue
+    w("stooq_" + _slug(sym) + ".csv", "Date,Open,High,Low,Close,Volume\n" + "\n".join(f"2026-10-{d:02d},100,101,99,{100 + d * 0.3:.2f},0" for d in range(1, 31)))
+for name, _urls, _dom in config.OFFICIAL_FEEDS:
+    w("rss_" + _slug(name) + ".xml", f"""<?xml version="1.0"?><rss><channel><item><title>TEST {name}: statement on strategic deterrence</title><link>https://example.com/{_slug(name)}</link><description>TEST nuclear readiness</description><pubDate>{now.strftime('%a, %d %b %Y %H:%M:%S')} +0000</pubDate></item><item><title>Unrelated</title><link>https://example.com/x</link></item></channel></rss>""")
+for slug in config.FCDO_SLUGS:
+    w("fcdo_" + slug + ".json", {"title": slug.title() + " travel advice", "public_updated_at": (now - timedelta(days=2)).isoformat(),
+                                "details": {"change_description": "TEST update", "alert_status": ["avoid_all_travel_to_whole_country"] if slug in ("russia", "belarus", "ukraine") else []}})
+for tag in config.MASTODON_TAGS:
+    w("masto_" + _slug(tag) + ".json", [{"content": f"<p>TEST mastodon post about nuclear #{tag}</p>", "account": {"acct": "test@mastodon.social"}, "created_at": now.isoformat(), "favourites_count": 3, "reblogs_count": 1, "url": "https://mastodon.social/@test/1"}])
+print("extra fixtures written")
+
+# ---- fixtures for the reworked market + fire providers ----
+for sid in ("DCOILWTICO", "SP500", "VIXCLS"):
+    w("fred_" + _slug(sid) + ".csv", "observation_date," + sid + "\n" + "\n".join(f"2026-10-{d:02d},{70 + d * 0.2:.2f}" for d in range(1, 31)))
+for sym in ("GC=F", "ITA", "CL=F", "^GSPC"):
+    w("yahoo_" + _slug(sym) + ".json", {"chart": {"result": [{"indicators": {"quote": [{"close": [100 + i * 0.5 for i in range(22)]}]}}], "error": None}})
+for name, bbox in config.FIRMS_AREAS:
+    w("firms_" + _slug(bbox) + ".csv", "latitude,longitude,bright_ti4\n" + "\n".join(f"{48 + i * 0.01},{35 + i * 0.01},330" for i in range(12)))
+print("market/fire fixtures written")

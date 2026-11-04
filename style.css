@@ -149,3 +149,16 @@ select{min-height:44px;background:var(--bg);color:var(--text);border:1px solid v
 .foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;font-size:13px;color:var(--dimmer);border-top:1px solid var(--line);padding-top:20px}
 
 @media (prefers-reduced-motion:reduce){.ticker,.blink{animation:none}}
+
+/* diagnostics + data-state notes */
+.warn-note{color:var(--amber)}
+.diag summary{cursor:pointer;font-size:13px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);padding:6px 0;list-style-position:inside}
+.diag summary:hover{color:var(--text)}
+.diag[open] summary{color:var(--text)}
+.diag-tbl td{white-space:normal;vertical-align:top}
+.diag-tbl td:first-child{white-space:nowrap}
+.diag-msg{font-size:13px;overflow-wrap:anywhere;max-width:620px}
+.error-bar a{color:var(--amber)}
+.fp > span:first-child{min-width:0;flex:1 1 auto}
+.fp-sub{overflow-wrap:anywhere}
+.fp .fp-r{flex:none}

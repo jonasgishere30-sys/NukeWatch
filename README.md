@@ -87,3 +87,23 @@ Levels: 0–19 Baseline · 20–39 Watch · 40–59 Elevated · 60–79 High · 
 The ladder placement is automatic keyword matching on headlines, so it can be wrong. Read the stories.
 
 Article photos and headlines belong to their publishers; the site shows them as linked previews back to the original story.
+
+## When sources fail
+
+* Every source gets a status each scan: **live**, **recent (cached)**, **old data** (latest request failed, last good result shown with its age), **failed**, **not set up** (needs a key), or **waiting** (news-API budget used; refreshed next scan).
+* Open **Data sources** at the bottom of the site to see each source's status and exact error message.
+* If fewer than 4 of the 6 flashpoints have news data, the site shows **INSUFFICIENT DATA** instead of a score. Missing data is never counted as calm.
+* Results are cached in `data/cache/` (preserved between deploys), so slow-changing numbers aren't re-requested every 15 minutes.
+* GDELT (news) throttles shared cloud servers, so requests are spaced 6.5 s apart, retried with growing waits, and capped per scan (`GDELT_SPACING_S`, `GDELT_MAX_REQUESTS` in `collector/config.py`).
+
+### Live connection test
+**Actions → diagnose → Run workflow** makes one plain request to every data source *from GitHub's servers* and prints the real HTTP status and response. Run it after changing sources or secrets; the results are also attached to the run as `diagnostics.json`.
+
+### Optional secrets (Settings → Secrets and variables → Actions)
+| Secret | What it enables |
+|---|---|
+| `BSKY_HANDLE`, `BSKY_APP_PASSWORD` | Bluesky search (anonymous search is blocked). Use an app password, not your main password. |
+| `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | Reddit (anonymous requests from cloud servers are blocked). Create a "script" app at reddit.com/prefs/apps; Reddit may require API approval. |
+| `FIRMS_MAP_KEY` | NASA fire hotspots. |
+
+Keys only ever go in GitHub secrets, never in the website code.

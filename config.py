@@ -1,6 +1,6 @@
 """All the settings you are likely to edit live here."""
 
-USER_AGENT = "NukeWatch/0.1 (+https://github.com/YOUR-USERNAME/nuke-watch)"
+USER_AGENT = "NukeWatch/0.3 (+https://github.com/jonasgishere30-sys/NukeWatch)"
 
 # ---------------------------------------------------------------------------
 # Flashpoints: political hotspots that involve a nuclear-armed state.
@@ -119,6 +119,7 @@ AIRCRAFT_TYPES = {
                "TU95": "Tu-95 Bear", "T160": "Tu-160 Blackjack", "TU22": "Tu-22M Backfire"},
     "tanker": {"K35R": "KC-135R Stratotanker", "K35E": "KC-135E", "KC46": "KC-46 Pegasus",
                "K46": "KC-46 Pegasus", "DC10": "KC-10 Extender", "A332": "A330 MRTT (check)"},
+    "airlift": {"C17": "C-17 Globemaster III", "C5M": "C-5M Super Galaxy", "A400": "A400M Atlas", "IL76": "Il-76"},
     "recon": {"R135": "RC-135", "E3TF": "E-3 Sentry (AWACS)", "E3CF": "E-3 Sentry (AWACS)",
               "P8": "P-8A Poseidon", "Q4": "RQ-4 Global Hawk", "U2": "U-2"},
 }
@@ -138,5 +139,95 @@ EXERCISES = [
     # {"name": "Global Thunder", "start": "2026-10-20", "end": "2026-11-05", "affects": ["command", "bomber", "tanker"]},
 ]
 
+# ---------------------------------------------------------------------------
+# Request pacing. GDELT throttles shared cloud IPs (GitHub runners), so we space and cap requests
+# and let the cache (data/cache) serve slow-changing numbers between refreshes.
+# ---------------------------------------------------------------------------
+GDELT_SPACING_S = 6.5        # seconds between GDELT requests
+GDELT_MAX_REQUESTS = 18      # per scan; anything beyond this is served from cache
+MIN_FLASHPOINT_COVERAGE = 4  # below this many flashpoints with news data, the index says "insufficient data"
+
 # How many entries of history to keep (one per run; 15-min runs -> ~30 days).
 HISTORY_MAX = 3000
+
+
+# ===========================================================================
+# EXTRA SIGNALS
+# ===========================================================================
+
+# Topic radar: news volume for each topic vs its own 7-day average (GDELT).
+TOPIC_QUERIES = [
+    ("Nuclear test", '("nuclear test" OR "underground test" OR "test site")'),
+    ("Missile launch", '("ballistic missile" OR "missile launch" OR "ICBM launch" OR "hypersonic missile")'),
+    ("Mobilization", '(mobilization OR mobilisation OR conscription OR "reservists called")'),
+    ("Evacuation", '(evacuation OR evacuate) (embassy OR citizens OR nationals)'),
+    ("Air raid / sirens", '("air raid" OR "air-raid" OR "sirens sounded" OR "missile alert")'),
+    ("Cyberattack", '(cyberattack OR "cyber attack" OR "power grid attack" OR blackout) (Russia OR China OR Iran OR "North Korea")'),
+    ("Nuclear plant / radiation", '("radiation levels" OR "nuclear plant" OR Zaporizhzhia OR "radioactive")'),
+    ("Strategic forces", '("nuclear forces" OR "strategic bombers" OR "nuclear submarine" OR "nuclear triad" OR DEFCON)'),
+]
+
+# Known nuclear test sites. Shallow quakes nearby get flagged (most will still be natural or mining).
+TEST_SITES = [
+    {"name": "Punggye-ri (North Korea)", "lat": 41.28, "lon": 129.08, "radius_km": 120},
+    {"name": "Novaya Zemlya (Russia)", "lat": 73.37, "lon": 54.97, "radius_km": 200},
+    {"name": "Lop Nur (China)", "lat": 41.55, "lon": 88.35, "radius_km": 150},
+    {"name": "Nevada test site (US)", "lat": 37.12, "lon": -116.05, "radius_km": 80},
+    {"name": "Pokhran (India)", "lat": 27.08, "lon": 71.75, "radius_km": 80},
+    {"name": "Ras Koh (Pakistan)", "lat": 28.83, "lon": 64.95, "radius_km": 80},
+]
+
+# Maritime warnings that matter (NGA). First match wins.
+NAV_WARNING_TYPES = [
+    ("Missile / rocket", ["missile", "rocket", "space debris", "launch"]),
+    ("Firing exercise", ["gunnery", "firing exercise", "live fire", "hazardous operations", "military exercise"]),
+    ("Submarine ops", ["submarine"]),
+]
+
+# Countries watched for internet outages (ISO 2-letter codes).
+OUTAGE_COUNTRIES = {"RU": "Russia", "UA": "Ukraine", "BY": "Belarus", "IR": "Iran", "IL": "Israel", "LB": "Lebanon",
+                    "SY": "Syria", "IN": "India", "PK": "Pakistan", "CN": "China", "TW": "Taiwan", "KP": "North Korea",
+                    "KR": "South Korea", "PL": "Poland", "EE": "Estonia", "LV": "Latvia", "LT": "Lithuania", "FI": "Finland"}
+
+# Public attention: English Wikipedia pageviews vs their 30-day median.
+WIKI_ARTICLES = ["Potassium_iodide", "Fallout_shelter", "Nuclear_warfare", "DEFCON", "Nuclear_fallout",
+                 "Doomsday_Clock", "Emergency_Alert_System", "Nuclear_winter", "Bomb_shelter", "Mutual_assured_destruction"]
+
+# Markets: each tries its providers in order (fred / yahoo / stooq / cboe), first success wins.
+MARKETS = [
+    ("VIX (fear index)", [("cboe", "VIX"), ("fred", "VIXCLS")]),
+    ("Gold (USD)", [("yahoo", "GC=F"), ("stooq", "xauusd")]),
+    ("Crude oil (WTI)", [("fred", "DCOILWTICO"), ("yahoo", "CL=F")]),
+    ("US defense stocks (ITA)", [("yahoo", "ITA"), ("stooq", "ita.us")]),
+    ("S&P 500", [("fred", "SP500"), ("yahoo", "^GSPC")]),
+]
+
+# Official statements: (name, candidate feed URLs tried in order, domain for a GDELT fallback search).
+OFFICIAL_FEEDS = [
+    ("NATO", ["https://www.nato.int/cps/rss/en/natohq/rssFeed.xsl/rssFeed.xml",
+              "https://www.nato.int/cps/en/natohq/rss.htm"], "nato.int"),
+    ("US Dept of Defense", ["https://www.defense.gov/DesktopModules/ArticleCS/RSS.ashx?ContentType=1&Site=945&max=20"], "defense.gov"),
+    ("US State Dept", ["https://www.state.gov/rss-feed/press-releases/feed/",
+                       "https://www.state.gov/feed/"], "state.gov"),
+    ("Kremlin", ["http://en.kremlin.ru/events/president/news/feed", "http://en.kremlin.ru/events/all/feed"], "kremlin.ru"),
+    ("UN press", ["https://press.un.org/en/rss.xml", "https://news.un.org/feed/subscribe/en/news/all/rss.xml"], "un.org"),
+    ("IAEA", ["https://www.iaea.org/feeds/topnews"], "iaea.org"),
+    ("UK Gov (defence)", ["https://www.gov.uk/search/news-and-communications.atom?organisations%5B%5D=ministry-of-defence"], None),
+]
+OFFICIAL_KEYWORDS = ["nuclear", "missile", "deterr", "strategic", "mobiliz", "escalat", "warhead", "icbm", "evacuat",
+                     "security council", "ultimatum", "red line", "retaliat", "sanction", "alert", "readiness"]
+
+# UK Foreign Office travel advice pages to watch (gov.uk slugs). "Avoid all travel" changes are a strong signal.
+FCDO_SLUGS = ["russia", "ukraine", "belarus", "israel", "iran", "lebanon", "syria", "iraq", "india", "pakistan",
+              "china", "taiwan", "north-korea", "south-korea", "japan", "poland", "estonia", "latvia", "lithuania", "moldova"]
+
+# Social: public Mastodon hashtags (no account needed).
+MASTODON_TAGS = ["nuclear", "nuclearwar", "ukraine", "iran", "taiwan", "osint"]
+
+# Telegram: public channel usernames to read via t.me/s/<name>. Add OSINT / news channels you trust.
+TELEGRAM_CHANNELS = []
+TELEGRAM_KEYWORDS = ["nuclear", "missile", "iskander", "yars", "sarmat", "bomber", "submarine", "mobiliz", "evacuat",
+                     "air raid", "ядер", "ракет"]
+
+# NASA FIRMS fire hotspots in conflict zones (needs free key in FIRMS_MAP_KEY secret). west,south,east,north
+FIRMS_AREAS = [("Ukraine & W. Russia", "22,44,45,56"), ("Israel / Lebanon / Iran", "34,29,60,38")]
