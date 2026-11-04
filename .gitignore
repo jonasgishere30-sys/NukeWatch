@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 tests/fixtures/
 _build/
+_site/
+_test/
+test-results/
+.verified-browser/
