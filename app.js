@@ -17,7 +17,6 @@
     'Nuclear drills, doctrine changes, explicit threats.', 'Bombers dispersed, subs surged, forces on alert.', 'Any nuclear detonation in conflict.'];
   var RC = ['#A3A39C', '#F5F5F0', '#FFB547', '#FF7A59', '#FF4D3D', '#FF2E2E'];
   var CAT = { command: ['Airborne command', '#FF7A59'], bomber: ['Bomber', '#FF9F5A'], tanker: ['Tanker', '#FFB547'], recon: ['Recon', '#A3A39C'] };
-  var TIER = { 3: '#FF4D3D', 2: '#FF9F5A', 1: '#C9B458' };
   var SITES = [
     ['Washington, D.C.', 38.9, -77.0], ['Offutt AFB (STRATCOM), Nebraska', 41.12, -95.91], ['Minot AFB, North Dakota', 48.42, -101.36],
     ['Malmstrom AFB, Montana', 47.5, -111.18], ['F.E. Warren AFB, Wyoming', 41.13, -104.87], ['Kings Bay sub base, Georgia', 30.8, -81.52],
@@ -64,16 +63,21 @@
   // ---------- map ----------
   var map = L.map('map', { worldCopyJump: true, minZoom: 1.5, zoomSnap: 0.5, scrollWheelZoom: false }).setView([35, 30], 1.5);
   map.on('focus click', function () { map.scrollWheelZoom.enable(); });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-    attribution: '&copy; OpenStreetMap contributors &copy; CARTO', subdomains: 'abcd', maxZoom: 18
+  // Free basemap, no API key (Esri World Dark Gray Canvas). If it ever fails, the country outlines below still show.
+  var ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/';
+  L.tileLayer(ESRI + 'World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors', maxZoom: 16
   }).addTo(map);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', { subdomains: 'abcd', maxZoom: 18, pane: 'shadowPane' }).addTo(map);
+  L.tileLayer(ESRI + 'World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 16, pane: 'shadowPane' }).addTo(map);
+  var baseLayer = L.layerGroup().addTo(map);
   var groups = { conflict: L.layerGroup().addTo(map), aircraft: L.layerGroup().addTo(map), sites: L.layerGroup() };
   var ringLayer = L.layerGroup().addTo(map);
 
   fetch('assets/countries.geojson').then(function (r) { return r.json(); }).then(function (g) {
     countriesGeo = g;
     g.features.forEach(function (f) { if (f.id != null) countryNames[String(f.id)] = f.properties.name; });
+    // Neutral outline of every country, drawn under the highlights.
+    L.geoJSON(g, { interactive: false, style: { color: '#3A3A36', weight: 0.6, fillColor: '#1A1A18', fillOpacity: 0.55 } }).addTo(baseLayer);
     if (state.data) { drawConflict(); renderTies(state.data); }
   });
 
@@ -90,21 +94,30 @@
 
   function drawConflict() {
     var g = groups.conflict; g.clearLayers();
-    var tier = {}, ties = {};
+    // Colour by ROLE (side / involved / threatened); brightness by how high the flashpoint's rung is.
+    // A country in several conflicts takes its strongest role (side > involved > threatened).
+    var RANK = { party: 3, involved: 2, threatened: 1 };
+    var best = {}, ties = {};
     state.data.flashpoints.forEach(function (f) {
       var c = roles(f);
       ['party', 'involved', 'threatened'].forEach(function (role) {
         (c[role] || []).forEach(function (id) {
-          var t = role === 'party' ? (f.rung >= 3 ? 3 : f.rung === 2 ? 2 : 1) : role === 'involved' ? (f.rung >= 3 ? 2 : 1) : 1;
-          tier[id] = Math.max(tier[id] || 0, t);
-          (ties[id] = ties[id] || []).push(f.name + ' · ' + role + ' · rung ' + f.rung);
+          var cur = best[id];
+          if (!cur || RANK[role] > RANK[cur.role] || (RANK[role] === RANK[cur.role] && f.rung > cur.rung)) best[id] = { role: role, rung: f.rung };
+          var label = role === 'party' ? 'side' : role;
+          (ties[id] = ties[id] || []).push(f.name + ' · ' + label + ' · rung ' + f.rung);
         });
       });
     });
+    var ROLE_COL = { party: '#FF4D3D', involved: '#FF9F5A', threatened: '#C9B458' };
     if (countriesGeo) {
       L.geoJSON(countriesGeo, {
-        filter: function (ft) { return !!tier[String(ft.id)]; },
-        style: function (ft) { var t = tier[String(ft.id)]; return { color: TIER[t], weight: 1, fillColor: TIER[t], fillOpacity: t === 3 ? 0.32 : t === 2 ? 0.22 : 0.14 }; },
+        filter: function (ft) { return !!best[String(ft.id)]; },
+        style: function (ft) {
+          var b = best[String(ft.id)], col = ROLE_COL[b.role];
+          var op = b.role === 'party' ? 0.18 + 0.07 * b.rung : b.role === 'involved' ? 0.2 : 0.14;
+          return { color: col, weight: 1, fillColor: col, fillOpacity: Math.min(op, 0.6) };
+        },
         onEachFeature: function (ft, layer) {
           var box = el('div', null, [el('strong', { text: ft.properties.name })]);
           (ties[String(ft.id)] || []).forEach(function (t) { box.appendChild(el('br')); box.appendChild(document.createTextNode(t)); });
