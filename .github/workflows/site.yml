@@ -46,6 +46,37 @@ jobs:
           touch _build/collector/__init__.py _build/.nojekyll
           python -m compileall -q _build/collector
           node --check _build/assets/app.js
+      - name: Render a complete keyless world map
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('_build/assets/app.js')
+          js = path.read_text()
+          start = js.index('  L.tileLayer(')
+          end = js.index('  var groups =', start)
+          js = js[:start] + "  map.createPane('worldBase');\n  map.getPane('worldBase').style.zIndex = '350';\n" + js[end:]
+          assert 'minZoom: 1.5' in js
+          js = js.replace('minZoom: 1.5', 'minZoom: 0', 1)
+          needle = '    countriesGeo = g;'
+          assert js.count(needle) == 1
+          replacement = '''    countriesGeo = g;
+              L.geoJSON(g, {
+                pane: 'worldBase',
+                style: { color: '#58616e', weight: 0.7, fillColor: '#1b222c', fillOpacity: 1 },
+                onEachFeature: function (ft, layer) {
+                  var label = document.createElement('span');
+                  label.textContent = ft.properties.name || 'Country';
+                  layer.bindTooltip(label, { sticky: true });
+                }
+              }).addTo(map);
+              map.fitBounds([[-85, -180], [85, 180]], { padding: [12, 12] });'''
+          js = js.replace(needle, replacement, 1)
+          assert 'L.tileLayer(' not in js
+          path.write_text(js)
+          page = Path('_build/index.html')
+          page.write_text(page.read_text().replace('Map © OpenStreetMap contributors © CARTO.', 'Map rendered from bundled country boundaries.'))
+          PY
+          node --check _build/assets/app.js
       - name: Restore collection history
         uses: actions/cache/restore@v4
         with:
@@ -68,11 +99,12 @@ jobs:
           for ref in re.findall(r'(?:src|href)="([^"]+)"', html):
               if not ref.startswith(('http:', 'https:', '#')):
                   assert (root / ref).is_file(), f'Missing page dependency: {ref}'
-          json.loads((root / 'assets/countries.geojson').read_text())
+          world = json.loads((root / 'assets/countries.geojson').read_text())
+          assert len(world['features']) >= 177
           data = json.loads((root / 'data/latest.json').read_text())
           assert all(k in data for k in ('updated', 'score', 'flashpoints', 'aircraft', 'summary'))
           assert 0 <= data['score'] <= 100
-          print('Asset paths, map data, and dashboard JSON passed validation.')
+          print('Asset paths, world boundaries, and dashboard JSON passed validation.')
           print('Source availability:', data.get('errors', {}))
           PY
       - name: Preserve baseline history for the next scan
