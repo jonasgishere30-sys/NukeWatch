@@ -96,6 +96,62 @@
 
   <div class="cols2 rule">
     <section>
+      <div class="label-row"><h2 class="label">Topic radar · news vs 7-day average</h2></div>
+      <div id="topics"></div>
+      <p class="note">Each bar is today's coverage compared with a normal day. 1× is normal; 2× or more is flagged.</p>
+    </section>
+    <section>
+      <div class="label-row"><h2 class="label">Public attention · Wikipedia views</h2></div>
+      <div id="attention"></div>
+      <p class="note">Yesterday's English Wikipedia views compared with the 30-day median. People look these up when they get scared.</p>
+    </section>
+  </div>
+
+  <div class="cols2 rule">
+    <section>
+      <h2 class="label">Official statements</h2>
+      <div id="statements"></div>
+      <p class="note">NATO, U.S. Defense and State Departments, Kremlin, UN, IAEA and UK Defence feeds, filtered for nuclear and escalation keywords.</p>
+    </section>
+    <section>
+      <h2 class="label">Markets</h2>
+      <div id="markets"></div>
+      <p class="note">Markets react to fear fast: watch for a VIX jump with gold and defense stocks rising together.</p>
+    </section>
+  </div>
+
+  <div class="cols2 rule">
+    <section>
+      <h2 class="label">Seismic activity near nuclear test sites · 7 days</h2>
+      <div id="seismic"></div>
+      <p class="note">A shallow quake (under 5 km deep) near a test site can be a nuclear test. Most are natural or mining blasts. USGS data.</p>
+    </section>
+    <section>
+      <h2 class="label">Maritime warnings · missile, rocket &amp; firing areas</h2>
+      <div id="navwarn"></div>
+      <p class="note">Active NGA broadcast warnings to ships. Missile tests and launches are announced this way.</p>
+    </section>
+  </div>
+
+  <div class="cols2 rule">
+    <section>
+      <h2 class="label">Internet outages · 24 hours</h2>
+      <div id="outages"></div>
+      <p class="note">Country-level outages from IODA (Georgia Tech). Large outages can mean cyberattacks, strikes on infrastructure or shutdowns.</p>
+    </section>
+    <section>
+      <h2 class="label">UK Foreign Office travel advice</h2>
+      <div id="fcdo"></div>
+      <p class="note">“Avoid all travel” updated in the last 7 days counts toward the index.</p>
+      <div id="fires-wrap" hidden>
+        <h2 class="label gap">Fire hotspots in conflict zones · 24h</h2>
+        <div id="fires"></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="cols2 rule">
+    <section>
       <h2 class="label">Government &amp; civil-defense news · 3 days</h2>
       <div id="gov-news"></div>
       <p class="note">Routine preparedness advice counts little. Sudden new orders (shelters opened, iodine handed out, reservists called up) count a lot.</p>
@@ -141,7 +197,7 @@
   <section class="cols3 rule small-text" id="method">
     <div>
       <h2 class="label">How it works</h2>
-      <p>Every 15 minutes NukeWatch reads world news (GDELT), U.S. State Department advisories, military flight feeds and social media. Headlines place each flashpoint on the ladder. Other signals are compared with their own recent history and down-weighted during known exercises.</p>
+      <p>Every 15 minutes NukeWatch reads world news, official statements, travel advisories from the U.S. and UK, military flights, maritime missile warnings, earthquakes near nuclear test sites, internet outages, Wikipedia attention, markets and social media. Headlines place each flashpoint on the ladder. Other signals are compared with their own recent history and down-weighted during known exercises.</p>
     </div>
     <div>
       <h2 class="label">What it can’t see</h2>
@@ -149,7 +205,7 @@
     </div>
     <div>
       <h2 class="label">Sources</h2>
-      <p>GDELT · U.S. State Department · airplanes.live / adsb.fi · Bluesky · Reddit. Map tiles © Esri; borders from Natural Earth. Photos and headlines belong to their publishers and link to the original story.</p>
+      <p>GDELT news · U.S. State Dept · UK Foreign Office · airplanes.live / adsb.fi · USGS · NGA maritime warnings · IODA · Wikipedia · Cboe / Stooq · NATO, DoD, Kremlin, UN, IAEA feeds · Bluesky · Mastodon · Reddit · Telegram · NASA FIRMS. Map tiles © Esri; borders from Natural Earth. Photos and headlines belong to their publishers and link to the original story.</p>
     </div>
   </section>
 

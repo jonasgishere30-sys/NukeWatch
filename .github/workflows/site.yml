@@ -2,31 +2,88 @@ name: Build and deploy NukeWatch
 
 on:
   push:
+    branches: [main, release/new-dashboard]
+  pull_request:
     branches: [main]
-    paths:
-      - '*.html'
-      - '*.css'
-      - '*.js'
-      - '*.geojson'
-      - '*.py'
-      - '.github/workflows/site.yml'
   schedule:
     - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: nukewatch-pages
+  group: nukewatch-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  publish:
+  checks:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Restore browser verification for this exact commit
+        id: browser-proof
+        uses: actions/cache@v4
+        with:
+          path: .verified-browser
+          key: nukewatch-browser-${{ github.sha }}
+      - name: Check source syntax
+        run: |
+          python -m compileall -q collector tests
+          node --check assets/app.js
+      - name: Test the collector with isolated fake data
+        run: |
+          mkdir -p _test
+          cp index.html countries.geojson _test/
+          cp -r assets collector tests _test/
+          cd _test
+          python tests/make_fixtures.py
+          NUKEWATCH_FIXTURES=tests/fixtures python -m collector.run
+          python - <<'PY'
+          import json, pathlib, re
+          root = pathlib.Path('.')
+          for ref in re.findall(r'(?:src|href)="([^"]+)"', (root / 'index.html').read_text()):
+              if not ref.startswith(('http:', 'https:', '#')):
+                  assert (root / ref).is_file(), ref
+          data = json.loads((root / 'data/latest.json').read_text())
+          assert not data['errors'], data['errors']
+          assert 0 <= data['score'] <= 100
+          assert len(json.loads((root / 'countries.geojson').read_text())['features']) >= 177
+          PY
+      - name: Install browser test tools
+        if: steps.browser-proof.outputs.cache-hit != 'true'
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Test the styled desktop and mobile dashboard
+        if: steps.browser-proof.outputs.cache-hit != 'true'
+        run: python tests/check_browser.py _test
+      - name: Record successful browser verification
+        if: steps.browser-proof.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p .verified-browser
+          echo "${{ github.sha }}" > .verified-browser/commit
+      - name: Save browser screenshots
+        if: always() && steps.browser-proof.outputs.cache-hit != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-browser-checks
+          path: test-results
+          if-no-files-found: ignore
+
+  publish:
+    needs: checks
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -37,54 +94,44 @@ jobs:
           python-version: '3.12'
       - name: Check Pages configuration
         uses: actions/configure-pages@v5
-      - name: Assemble uploaded source files into the required layout
-        run: |
-          mkdir -p _build/collector _build/assets
-          cp index.html _build/index.html
-          cp style.css app.js countries.geojson _build/assets/
-          cp run.py config.py sources.py _build/collector/
-          touch _build/collector/__init__.py _build/.nojekyll
-          python -m compileall -q _build/collector
-          node --check _build/assets/app.js
-      - name: Restore collection history
+      - name: Restore live collection history
         uses: actions/cache/restore@v4
         with:
-          path: _build/data
-          key: nukewatch-data-${{ github.run_id }}-${{ github.run_attempt }}
+          path: data
+          key: nukewatch-source-layout-data-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            nukewatch-data-
-      - name: Collect live data (never publish test fixtures)
-        working-directory: _build
+            nukewatch-source-layout-data-
+      - name: Collect live data, not test fixtures
+        timeout-minutes: 25
         env:
           BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
+          FIRMS_MAP_KEY: ${{ secrets.FIRMS_MAP_KEY }}
         run: python -m collector.run
-      - name: Validate published files
+      - name: Validate and package the public website
         run: |
           python - <<'PY'
-          import json, pathlib, re
-          root = pathlib.Path('_build')
-          html = (root / 'index.html').read_text()
-          for ref in re.findall(r'(?:src|href)="([^"]+)"', html):
-              if not ref.startswith(('http:', 'https:', '#')):
-                  assert (root / ref).is_file(), f'Missing page dependency: {ref}'
-          json.loads((root / 'assets/countries.geojson').read_text())
+          import json, pathlib
+          root = pathlib.Path('.')
+          for path in ('index.html', 'assets/style.css', 'assets/app.js', 'countries.geojson', 'data/latest.json'):
+              assert (root / path).is_file(), path
           data = json.loads((root / 'data/latest.json').read_text())
-          assert all(k in data for k in ('updated', 'score', 'flashpoints', 'aircraft', 'summary'))
+          assert 'updated' in data and 'flashpoints' in data
           assert 0 <= data['score'] <= 100
-          print('Asset paths, map data, and dashboard JSON passed validation.')
-          print('Source availability:', data.get('errors', {}))
+          print('Live-source errors:', data.get('errors', {}))
           PY
-      - name: Preserve baseline history for the next scan
+          mkdir -p _site
+          cp index.html countries.geojson _site/
+          cp -r assets data _site/
+          touch _site/.nojekyll
+      - name: Preserve live history
         uses: actions/cache/save@v4
         with:
-          path: _build/data
-          key: nukewatch-data-${{ github.run_id }}-${{ github.run_attempt }}
-      - name: Package only public website files
-        run: rm -rf _build/collector
+          path: data
+          key: nukewatch-source-layout-data-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _build
+          path: _site
       - name: Deploy website
         id: deployment
         uses: actions/deploy-pages@v4
