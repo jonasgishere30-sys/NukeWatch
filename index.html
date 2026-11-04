@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NukeWatch</title>
+<meta name="description" content="An open-source escalation index: flashpoints, world news, government warnings, military aircraft and social media, updated every 15 minutes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="page">
+
+  <header class="top" id="now">
+    <span class="logo">NUKEWATCH</span>
+    <nav aria-label="Sections">
+      <a href="#now" class="on">Now</a><a href="#flashpoints">Flashpoints</a><a href="#signals">Signals</a><a href="#map-sec">Map</a><a href="#method">Method</a>
+    </nav>
+    <span id="updated" class="dim">Loading…</span>
+  </header>
+
+  <div class="live" aria-label="Latest headlines">
+    <span class="live-tag"><span class="dot blink"></span>LIVE</span>
+    <div class="ticker-wrap"><div class="ticker" id="ticker"></div></div>
+  </div>
+  <div id="error-bar" class="error-bar" hidden></div>
+
+  <section class="hero" aria-label="Escalation index">
+    <div class="big"><span id="score">–</span><span class="of">/100</span></div>
+    <div class="hero-side">
+      <div id="level" class="level">LEVEL –</div>
+      <p id="headline" class="headline">Loading the latest scan…</p>
+      <div class="track"><span id="track-fill"></span><span id="track-dot"></span></div>
+      <div class="track-labels"><span>Baseline</span><span>Watch</span><span>Elevated</span><span>High</span><span>Severe</span></div>
+    </div>
+  </section>
+
+  <div class="summary">
+    <p id="summary-text" class="lede"></p>
+    <div class="changed"><h2 class="label">Changed since last scan</h2><ul id="changed"></ul></div>
+  </div>
+
+  <div class="cols3 rule">
+    <section id="flashpoints">
+      <h2 class="label">Flashpoints</h2>
+      <div id="fp-list"></div>
+    </section>
+    <section id="signals">
+      <h2 class="label">Signals</h2>
+      <div id="signal-list"></div>
+    </section>
+    <section>
+      <div class="label-row"><h2 class="label">Latest · <span id="news-scope">all</span></h2><button id="news-all" class="link-btn" hidden>Show all</button></div>
+      <div id="news-list"></div>
+    </section>
+  </div>
+
+  <section id="map-sec" aria-label="Map">
+    <div class="label-row">
+      <h2 class="label">World situation</h2>
+      <div id="layers" class="toggles" role="group" aria-label="Map layers"></div>
+    </div>
+    <div id="map" class="map"></div>
+    <p class="caption">
+      <span><i style="background:#FF4D3D"></i>At war / nuclear threats</span>
+      <span><i style="background:#FF9F5A"></i>Involved or building up</span>
+      <span><i style="background:#C9B458"></i>Threatened / political tension</span>
+      <span class="dim">Hover a country to see its ties. Strategic sites are illustrative, not a prediction.</span>
+    </p>
+  </section>
+
+  <div class="cols2 rule">
+    <section>
+      <h2 class="label">Where the <span id="pts-label">–</span> points come from</h2>
+      <div id="breakdown"></div>
+      <p id="baseline-note" class="note"></p>
+    </section>
+    <section>
+      <h2 class="label">What each level means</h2>
+      <div id="levels"></div>
+    </section>
+  </div>
+
+  <section class="rule">
+    <h2 class="label">Escalation ladder</h2>
+    <div id="ladder" class="ladder"></div>
+    <p class="note">Each flashpoint is placed on a rung automatically from its last 24 hours of headlines. Keyword matching can be wrong, so read the stories.</p>
+  </section>
+
+  <section class="rule">
+    <h2 class="label">Countries tied to each conflict</h2>
+    <div id="ties"></div>
+  </section>
+
+  <div class="cols2 rule">
+    <section>
+      <h2 class="label">Government &amp; civil-defense news · 3 days</h2>
+      <div id="gov-news"></div>
+      <p class="note">Routine preparedness advice counts little. Sudden new orders (shelters opened, iodine handed out, reservists called up) count a lot.</p>
+    </section>
+    <section>
+      <h2 class="label">Watched for</h2>
+      <div id="watch"></div>
+      <h2 class="label gap">U.S. State Dept · Level 4 “Do Not Travel”</h2>
+      <div id="level4" class="chips"></div>
+      <h2 class="label gap">Embassy ordered departures</h2>
+      <div id="ordered"></div>
+    </section>
+  </div>
+
+  <section class="rule">
+    <div class="label-row"><h2 class="label">Military aircraft broadcasting now</h2><span id="ac-meta" class="dim small"></span></div>
+    <div class="scroll-x">
+      <table class="tbl">
+        <thead><tr><th>Callsign</th><th>Type</th><th>Role</th><th>Altitude</th><th>Speed</th><th>Position</th></tr></thead>
+        <tbody id="ac-rows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="rule" id="effects">
+    <h2 class="label">Effects model</h2>
+    <div class="fx">
+      <div class="fx-controls">
+        <label class="field"><span class="dim small">Site</span><select id="site-sel"></select></label>
+        <div id="yields" class="seg" role="group" aria-label="Yield"></div>
+        <button id="show-rings" class="btn">Show on map</button>
+      </div>
+      <div id="rings"></div>
+    </div>
+    <p class="note">Approximate airburst radii (Glasstone &amp; Dolan scaling). Fallout from ground bursts is not modeled and can reach hundreds of km downwind.</p>
+  </section>
+
+  <section class="rule">
+    <div class="label-row"><h2 class="label">Social media</h2><span id="soc-meta" class="dim small"></span></div>
+    <div id="posts" class="posts"></div>
+  </section>
+
+  <section class="cols3 rule small-text" id="method">
+    <div>
+      <h2 class="label">How it works</h2>
+      <p>Every 15 minutes NukeWatch reads world news (GDELT), U.S. State Department advisories, military flight feeds and social media. Headlines place each flashpoint on the ladder. Other signals are compared with their own recent history and down-weighted during known exercises.</p>
+    </div>
+    <div>
+      <h2 class="label">What it can’t see</h2>
+      <p>Launch orders, alert levels and most submarine movements are classified. Many military aircraft fly with transponders off. Treat this as context, not a warning system.</p>
+    </div>
+    <div>
+      <h2 class="label">Sources</h2>
+      <p>GDELT · U.S. State Department · airplanes.live / adsb.fi · Bluesky · Reddit. Map © OpenStreetMap contributors © CARTO. Photos and headlines belong to their publishers and link to the original story.</p>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>NukeWatch · open source</span>
+    <span id="foot-scan" class="dim"></span>
+  </footer>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="assets/app.js"></script>
+</body>
+</html>
